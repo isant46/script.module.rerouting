@@ -1,13 +1,36 @@
 import re
 import sys
 
+try:
+    from urllib.parse import parse_qs, urlparse
+except ImportError:
+    from urlparse import parse_qs, urlparse
+
 
 class Rerouting:
     def __init__(self):
-        match = re.match('([^:]+://[^/]+)(/.*)', sys.argv[0] + sys.argv[2])
-        self._baseurl = match.group(1)
-        self._pathquery = match.group(2)
+        (scheme, netloc, self._path, params, self._query, fragment) = urlparse(sys.argv[0] + sys.argv[2])
+        self._baseurl = scheme + '://' + netloc
+        self._handle = int(sys.argv[1])
+        self._pathqs = (self._path + '?' + self._query) if self._query else self._path
+        self._query = parse_qs(self._query)
         self._routemap = {}
+
+    @property
+    def handle(self):
+        return self._handle
+
+    @property
+    def path(self):
+        return self._path
+
+    @property
+    def pathqs(self):
+        return self._pathqs
+
+    @property
+    def query(self):
+        return self._query
 
     def route(self, pattern):
         """
@@ -31,7 +54,7 @@ class Rerouting:
         """
         for (func, patterns) in self._routemap.items():
             for pattern in patterns:
-                match = re.fullmatch(pattern, self._pathquery)
+                match = re.match('^{}$'.format(pattern), self._pathqs)
 
                 if match is not None:
                     try:
@@ -48,7 +71,7 @@ class Rerouting:
 
         :param pathquery: A path with query.
         """
-        return self._baseurl + pathquery if pathquery.startswith('/') else '/' + pathquery
+        return self._baseurl + (pathquery if pathquery.startswith('/') else '/' + pathquery)
 
     def _map_route(self, func, pattern):
         """
